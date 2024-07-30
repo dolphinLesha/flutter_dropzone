@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_print
 
+import 'dart:io';
 import 'dart:math' show min;
 
 import 'package:flutter/material.dart';
@@ -21,6 +22,10 @@ class _MyAppState extends State<MyApp> {
   String message1 = 'Drop something here';
   String message2 = 'Drop something here';
   bool highlighted1 = false;
+
+  Map<int, dynamic> _files = {};
+  ValueNotifier<Map<int, dynamic>> _data = ValueNotifier({});
+  Map<int, ValueNotifier<double>> _fileLoaders = {};
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -56,6 +61,26 @@ class _MyAppState extends State<MyApp> {
                 },
                 child: const Text('Pick file'),
               ),
+              ValueListenableBuilder<Map<int, dynamic>>(
+                valueListenable: _data,
+                builder: (context, data, _) {
+                  return Container(
+                    height: 40,
+                    color: Colors.red,
+                    child: Row(
+
+                      children: [
+                        for (final entry in data.entries)
+                          Image.memory(
+                            entry.value['blob'],
+                            height: 40,
+                            width: 40,
+                          ),
+                      ],
+                    ),
+                  );
+                }
+              )
             ],
           ),
         ),
@@ -96,9 +121,7 @@ class _MyAppState extends State<MyApp> {
               print('Zone 1 unknown type: ${ev.runtimeType}');
           },
           onDropInvalid: (ev) => print('Zone 1 invalid MIME: $ev'),
-          onDropMultiple: (ev) async {
-            print('Zone 1 drop multiple: $ev');
-          },
+          onDropMultiple: _onFilesDropped,
         ),
       );
 
@@ -134,4 +157,38 @@ class _MyAppState extends State<MyApp> {
           },
         ),
       );
+
+  void _onFilesDropped(List<dynamic>? ev) async {
+    int currentLength = _files.length;
+    List<dynamic> files = ev ?? [];
+    files.length;
+
+    for (int i = currentLength; i < files.length + currentLength; i++) {
+      _files[i] = files[i - currentLength];
+      _fileLoaders[i] = ValueNotifier(0);
+      addFileLoader(_files[i], i);
+    }
+  }
+
+
+  void addFileLoader(dynamic file, int index) async {
+    final stream = controller1.getFileStream(file);
+    final result = BytesBuilder();
+    final wholeSize = await controller1.getFileSize(file);
+    String? extension = await controller1.getFileMIME(file);
+    print(wholeSize);
+    print(extension);
+    print(await controller1.getFilename(file));
+    await for (final chunk in stream) {
+      result.add(chunk);
+      _fileLoaders[index]!.value = result.length / wholeSize;
+    }
+    var map = {..._data.value};
+    map[index] = {
+      'name': await controller1.getFilename(file),
+      'blob': result.takeBytes(),
+      'type': extension,
+    };
+    _data.value = map;
+  }
 }

@@ -3,6 +3,7 @@ library flutter_dropzone_web;
 
 import 'dart:async';
 import 'dart:js_interop';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dropzone_platform_interface/flutter_dropzone_platform_interface.dart';
@@ -128,18 +129,30 @@ class FlutterDropzoneView {
     return arrayBuffer.toDart.asUint8List();
   }
 
-  Stream<List<int>> getFileStream(web.File file) async* {
+  Stream<List<int>> getFileStream(web.File file) {
     const int chunkSize = 1024 * 1024;
     final reader = web.FileReader();
     int start = 0;
-    while (start < file.size) {
+    StreamController<List<int>> _controller = StreamController();
+    final end = start + chunkSize > file.size ? file.size : start + chunkSize;
+    final blob = file.slice(start, end);
+    reader.readAsArrayBuffer(blob);
+
+    void onChangeHandler(web.Event evt) {
+      _controller.add((reader.result as ByteBuffer).asInt8List());
+      start += chunkSize;
+      if (start >= file.size) {
+        _controller.close();
+        return;
+      }
       final end = start + chunkSize > file.size ? file.size : start + chunkSize;
       final blob = file.slice(start, end);
       reader.readAsArrayBuffer(blob);
-      await reader.onLoadEnd.first; //???
-      yield reader.result as List<int>;
-      start += chunkSize;
     }
+
+    reader.onload = onChangeHandler.toJS;
+
+    return _controller.stream;
   }
 
   void _onLoaded() =>
