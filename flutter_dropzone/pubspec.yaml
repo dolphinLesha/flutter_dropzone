@@ -2,6 +2,7 @@ name: flutter_dropzone
 description: A drag-and-drop Flutter plugin (Web only).
 version: 4.0.1
 homepage: https://github.com/deakjahn/flutter_dropzone
+publish_to: none
 
 environment:
   sdk: ">=2.15.0 <4.0.0"
